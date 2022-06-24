@@ -5,7 +5,7 @@
 #define TRUE  1
 #define FALSE 0
 
-#define SYMBOL_TABLE_LENGTH   64
+#define SYMBOL_TABLE_LENGTH   128
 #define NO_INDEX              -1
 #define NO_ATR                 0
 #define LAST_WORKING_REG      12
@@ -43,4 +43,9 @@ static char* jumps[]={"JLTS", "JGTS", "JLES", "JGES", "JEQ ", "JNE ",
 
 static char* opp_jumps[]={"JGES", "JLES", "JGTS", "JLTS", "JNE ", "JEQ ",
                           "JGEU", "JLEU", "JGTU", "JLTU", "JNE ", "JEQ "};
+						
+typedef struct exp_vals {
+	int index;
+	int value;
+} exp_vals;
 #endif

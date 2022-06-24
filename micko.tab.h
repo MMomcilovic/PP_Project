@@ -83,8 +83,9 @@ union YYSTYPE
 
   int i;
   char *s;
+  struct exp_vals *vals;
 
-#line 88 "micko.tab.h"
+#line 89 "micko.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

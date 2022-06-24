@@ -176,7 +176,7 @@ Nonterminals, with rules where they appear
     num_exp <i> (45)
         on left: 34 35
         on right: 31 32 35 40 46 52 53
-    exp <i> (46)
+    exp <vals> (46)
         on left: 36 37 38 39 40
         on right: 34 35
     literal <i> (47)

@@ -1,0 +1,6 @@
+micko.y:251.5-7: warning: type clash on default action: <i> != <vals> [-Wother]
+  251 |   : exp
+      |     ^~~
+micko.y:271.5-11: warning: type clash on default action: <vals> != <i> [-Wother]
+  271 |   : literal
+      |     ^~~~~~~
