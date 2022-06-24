@@ -20,6 +20,11 @@
   int fcall_idx = -1;
   int lab_num = -1;
   FILE *output;
+  
+  int array_number = 0;
+  int literal_list_count = 0;
+  int array_literals[100];
+  int array_literals_idx = 0;
 %}
 
 %union {
@@ -42,9 +47,16 @@
 %token _SEMICOLON
 %token <i> _AROP
 %token <i> _RELOP
+%token _LSBRACKET
+%token _RSBRACKET
+%token _POINTER
+%token _FOR
+%token _AMPRESAND
+%token _INC
+%token _COLON
 
-%type <i> num_exp exp literal
-%type <i> function_call argument rel_exp if_part
+%type <i> num_exp exp literal 
+%type <i> function_call argument rel_exp if_part array_size
 
 %nonassoc ONLY_IF
 %nonassoc _ELSE
@@ -72,7 +84,6 @@ function
           fun_idx = insert_symbol($2, FUN, $1, NO_ATR, NO_ATR);
         else 
           err("redefinition of function '%s'", $2);
-
         code("\n%s:", $2);
         code("\n\t\tPUSH\t%%14");
         code("\n\t\tMOV \t%%15,%%14");
@@ -92,7 +103,6 @@ function
 parameter
   : /* empty */
       { set_atr1(fun_idx, 0); }
-
   | _TYPE _ID
       {
         insert_symbol($2, PAR, $1, 1, NO_ATR);
@@ -124,8 +134,48 @@ variable
         else 
            err("redefinition of '%s'", $2);
       }
+  | _TYPE _POINTER _ID _SEMICOLON 
+{
+	printf("aaa\n");
+}  // Definition of an Pointer
+  | _TYPE _ID array_size _SEMICOLON // Definiton of array
+  	  {
+        if(lookup_symbol($2, VAR|PAR|ARR) == NO_INDEX)
+		{
+			insert_symbol($2, ARR, $1, ++var_num, $3);
+            code("\n\t\tSUBS\t %%15,$%d,%%15", 4 * $3);
+		}
+        else 
+           err("redefinition of '%s'", $2);
+      }
+  | _TYPE _ID _ASSIGN _LBRACKET elements_list _RBRACKET _SEMICOLON // Definiton of array with initialization
+  ;
+  
+    
+elements_list
+  : literal
+  {
+	array_literals[literal_list_count] = $1;
+	literal_list_count += 1;
+  }
+  | elements_list _COLON literal
+  {
+	array_literals[literal_list_count] = $3;
+	literal_list_count += 1;
+  }
   ;
 
+array_size
+  : _LSBRACKET _INT_NUMBER _RSBRACKET
+  {
+	$$ = strtol($2, NULL, 10);
+  }
+  | _LSBRACKET _UINT_NUMBER _RSBRACKET
+  {
+	$$ = strtol($2, NULL, 10);
+  }
+  ;
+  
 statement_list
   : /* empty */
   | statement_list statement
@@ -136,7 +186,40 @@ statement
   | assignment_statement
   | if_statement
   | return_statement
+  | for_statement
   ;
+  
+for_statement
+  : _FOR _LPAREN _ID _ASSIGN literal
+	{
+		$<i>$ = ++lab_num;
+		int i = lookup_symbol($3, VAR|PAR);
+		if (i == NO_INDEX)
+			err("undefined %s", $3);
+		gen_mov($5, i);
+		code("\n@for%d:", lab_num);
+	}  
+	_SEMICOLON rel_exp
+	{
+		code("\n\t\t%s\t@exit%d", opp_jumps[$8], $<i>6);
+	}	
+	_SEMICOLON _ID _INC _RPAREN statement
+	{
+		int i = lookup_symbol($11, VAR|PAR);
+		if(i == NO_INDEX)
+			err("nedeklarisno %s", $11);
+		if(get_type(i) == INT)
+			code("\n\t\tADDS\t");
+		else
+			code("\n\t\tADDU\t");
+		gen_sym_name(i);
+		code(",$1,");
+		gen_sym_name(i);
+		code("\n\t\tJMP \t@for%d", $<i>6);
+		code("\n@exit%d:", $<i>6);
+	}
+  ;
+
 
 compound_statement
   : _LBRACKET statement_list _RBRACKET
@@ -153,11 +236,12 @@ assignment_statement
             err("incompatible types in assignment");
         gen_mov($3, idx);
       }
+  | _ID array_size _ASSIGN num_exp _SEMICOLON
+  | _ID _ASSIGN _AMPRESAND _ID _SEMICOLON
   ;
 
 num_exp
   : exp
-
   | num_exp _AROP exp
       {
         if(get_type($1) != get_type($3))
@@ -178,7 +262,10 @@ num_exp
 
 exp
   : literal
-
+  | _ID array_size
+  {
+	$$ = insert_literal($1, INT); 
+  }
   | _ID
       {
         $$ = lookup_symbol($1, VAR|PAR);
