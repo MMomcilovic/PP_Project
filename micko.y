@@ -56,8 +56,8 @@
 %token _INC
 %token _COLON
 
-%type <vals> exp
-%type <i> num_exp literal 
+%type <vals> exp num_exp
+%type <i> literal 
 %type <i> function_call argument rel_exp if_part array_size
 
 %nonassoc ONLY_IF
@@ -137,9 +137,12 @@ variable
            err("redefinition of '%s'", $2);
       }
   | _TYPE _POINTER _ID _SEMICOLON 
-{
-	printf("aaa\n");
-}  // Definition of an Pointer
+	{
+		if(lookup_symbol($3, VAR|PAR|ARR|PTR) == NO_INDEX)
+			insert_symbol($3, PTR, $1, ++var_num, NO_ATR);
+		else 
+           err("redefinition of '%s'", $3);	
+	}
   | _TYPE _ID array_size _SEMICOLON // Definiton of array
   	  {
         if(lookup_symbol($2, VAR|PAR|ARR|PTR) == NO_INDEX)
@@ -150,7 +153,19 @@ variable
         else 
            err("redefinition of '%s'", $2);
       }
-  | _TYPE _ID _ASSIGN _LBRACKET elements_list _RBRACKET _SEMICOLON // Definiton of array with initialization
+  | _TYPE _ID _ASSIGN _LBRACKET elements_list _RBRACKET _SEMICOLON
+	  {
+        if(lookup_symbol($2, VAR|PAR|ARR|PTR) == NO_INDEX)
+		{
+			int idx = insert_symbol($2, ARR, $1, ++var_num, literal_list_count);
+            code("\n\t\tSUBS\t %%15,$%d,%%15", 4 * literal_list_count);
+			for (int i =0; i < literal_list_count; i++) {
+				gen_mov_array(array_literals[i], i, idx);
+			}			
+		}
+        else 
+           err("redefinition of '%s'", $2);
+      }
   ;
   
     
@@ -234,16 +249,40 @@ assignment_statement
         if(idx == NO_INDEX)
           err("invalid lvalue '%s' in assignment", $1);
         else
-          if(get_type(idx) != get_type($3))
+          if(get_type(idx) != get_type($3->index))
             err("incompatible types in assignment");
-        gen_mov($3, idx);
+		if (get_kind($3->index) == ARR)
+			gen_mov_array($3->index, $3->value, idx);
+		else 
+			gen_mov($3->index, idx);
       }
   | _ID array_size _ASSIGN num_exp _SEMICOLON
   {
-	printf("aa\n");
+	int idx = lookup_symbol($1, ARR|PTR);
+	if (idx == NO_INDEX)
+		err("'%s' is not an array", $1);
+	else 
+		if (get_type(idx) != get_type($4->index)) 
+			err("incompatible types in assignment");
+	if (get_kind(idx) != PTR) {
+		if ($2 >= get_atr2(idx))
+			err("'%s' index out of range", $1);
+		gen_mov_array($4->index, $2, idx);
+	}
   }
   | _ID _ASSIGN _AMPRESAND _ID _SEMICOLON  {
-	printf("adsa\n");
+	int idx1 = lookup_symbol($1, VAR|PAR|ARR|PTR);
+	int idx2 = lookup_symbol($4, PTR);
+	if (idx1 == NO_INDEX) 
+	{
+		err("invalid lvalue '%s' in assignment", $1);
+	}
+	if (idx2 == NO_INDEX)
+	{
+		err("invalid rvalue '%s' in assignment", $4);
+	}
+	if (get_type(idx1) != get_type(idx2)) 
+		err("incompatible types in assignment");
   }
   ;
 
@@ -251,56 +290,87 @@ num_exp
   : exp
   | num_exp _AROP exp
       {
-        if(get_type($1) != get_type($3))
+        if(get_type($1->index) != get_type($3->index))
           err("invalid operands: arithmetic operation");
-        int t1 = get_type($1);    
+        int t1 = get_type($1->index);    
         code("\n\t\t%s\t", ar_instructions[$2 + (t1 - 1) * AROP_NUMBER]);
-        gen_sym_name($1);
+		
+		if (get_kind($1->index) == ARR)
+			gen_sym_name_array_elem($1->index, $1->value);
+		else
+			gen_sym_name($1->index);
         code(",");
-        gen_sym_name($3);
+		if (get_kind($3->index) == ARR)
+			gen_sym_name_array_elem($3->index, $3->value);
+		else
+			gen_sym_name($3->index);
         code(",");
-        free_if_reg($3);
-        free_if_reg($1);
-        $$ = take_reg();
-        gen_sym_name($$);
-        set_type($$, t1);
+        free_if_reg($3->index);
+        free_if_reg($1->index);
+		
+		struct exp_vals *value = (struct exp_vals*) malloc(sizeof(struct exp_vals));
+		value->index = take_reg();
+		value->value = -1;
+        $$ = value;
+		if (get_kind($$->index) == ARR)
+			gen_sym_name_array_elem($$->index, -1);
+		else 
+			gen_sym_name($$->index);
+        set_type($$->index, t1);
       }
   ;
 
 exp
   : literal
+	  {
+	  struct exp_vals *value = (struct exp_vals*) malloc(sizeof(struct exp_vals));
+	  value->index = $1;
+	  value->value = -1;
+	  $$ = value;
+	  }
   | _ID array_size
-  {
-	int head = lookup_symbol($1, ARR | ARR_PAR);
-	if (head == NO_INDEX)
-		err("'&s' undeclared", $1);
-	if (get_kind(head) == ARR) 
-	{
+	  {
+		int head = lookup_symbol($1, ARR);
+		if (head == NO_INDEX)
+			err("'%s' undeclared", $1);
 		if ($2 >= get_atr2(head))
-			err("'&s' index out of range", $1);
-	}
-	$$ = head;
-  }
+			err("'%s' index out of range", $1);
+		struct exp_vals *value = (struct exp_vals*) malloc(sizeof(struct exp_vals));
+		value->index = head;
+		value->value = $2;
+		$$ = value;
+	  }
   | _ID
       {
-        $$ = lookup_symbol($1, VAR|PAR|ARR);
-        if($$ == NO_INDEX)
+        int elem = lookup_symbol($1, VAR|PAR|ARR);
+        if(elem == NO_INDEX)
           err("'%s' undeclared", $1);
+		struct exp_vals *value = (struct exp_vals*) malloc(sizeof(struct exp_vals));
+		value->index = elem;
+		value->value = -1;
+		$$ = value;
       }
   | function_call
       {
-        $$ = take_reg();
-        gen_mov(FUN_REG, $$);
+        int elem = take_reg();
+		struct exp_vals *value = (struct exp_vals*) malloc(sizeof(struct exp_vals));
+		value->index = elem;
+		value->value = -1;
+		$$ = value;
+        gen_mov(FUN_REG, elem);
       }
-  
   | _LPAREN num_exp _RPAREN
-      { $$ = $2; }
+	  {
+		struct exp_vals *value = (struct exp_vals*) malloc(sizeof(struct exp_vals));
+		value->index = $2->index;
+		value->value = -1;
+		$$ = value;
+	  }
   ;
 
 literal
   : _INT_NUMBER
       { $$ = insert_literal($1, INT); }
-
   | _UINT_NUMBER
       { $$ = insert_literal($1, UINT); }
   ;
@@ -330,11 +400,11 @@ argument
 
   | num_exp
     { 
-      if(get_atr2(fcall_idx) != get_type($1))
+      if(get_atr2(fcall_idx) != get_type($1->index))
         err("incompatible type for argument");
-      free_if_reg($1);
+      free_if_reg($1->index);
       code("\n\t\t\tPUSH\t");
-      gen_sym_name($1);
+      gen_sym_name($1->index);
       $$ = 1;
     }
   ;
@@ -369,9 +439,9 @@ if_part
 rel_exp
   : num_exp _RELOP num_exp
       {
-        if(get_type($1) != get_type($3))
+        if(get_type($1->index) != get_type($3->index))
           err("invalid operands: relational operator");
-        $$ = $2 + ((get_type($1) - 1) * RELOP_NUMBER);
+        $$ = $2 + ((get_type($1->index) - 1) * RELOP_NUMBER);
         gen_cmp($1, $3);
       }
   ;
@@ -379,9 +449,9 @@ rel_exp
 return_statement
   : _RETURN num_exp _SEMICOLON
       {
-        if(get_type(fun_idx) != get_type($2))
+        if(get_type(fun_idx) != get_type($2->index))
           err("incompatible types in return");
-        gen_mov($2, FUN_REG);
+        gen_mov($2->index, FUN_REG);
         code("\n\t\tJMP \t@%s_exit", get_name(fun_idx));        
       }
   ;

@@ -1,11 +1,16 @@
+//RETURN: 6
+
 int main() {
-    int *a;
-    int *x;
-    int *tat;
-    int b = {1, 2, 188};
-    int niz[10];
-    a = &x;
-    niz[1] = 2;
+    int a;
+    int c;
+    int b = {1, 2, 3};
+	int niz[3];
+	niz[0] = 1;
+	niz[1] = 2;
 	niz[2] = 3;
-    return b[1];
+	a = 0;
+	for (c = 0; c < 3; c++) {
+		a = a + b[0];
+	}
+    return a;
 }

@@ -173,7 +173,7 @@ Nonterminals, with rules where they appear
     assignment_statement (44)
         on left: 31 32 33
         on right: 23
-    num_exp <i> (45)
+    num_exp <vals> (45)
         on left: 34 35
         on right: 31 32 35 40 46 52 53
     exp <vals> (46)

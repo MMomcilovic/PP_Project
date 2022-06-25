@@ -14,7 +14,7 @@ void free_if_reg(int reg_index);
 void gen_sym_name(int index);
 
 // generise CMP naredbu, parametri su indeksi operanada u TS-a 
-void gen_cmp(int operand1_index, int operand2_index);
+void gen_cmp(struct exp_vals *operand1_index, struct exp_vals *operand2_index);
 
 // generise MOV naredbu, parametri su indeksi operanada u TS-a 
 void gen_mov(int input_index, int output_index);

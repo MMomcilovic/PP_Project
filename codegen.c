@@ -39,31 +39,64 @@ void gen_sym_name(int index) {
   if(index > -1) {
     if(get_kind(index) == VAR) // -n*4(%14)
       code("-%d(%%14)", get_atr1(index) * 4);
-    else 
-      if(get_kind(index) == PAR) // m*4(%14)
-        code("%d(%%14)", 4 + get_atr1(index) *4);
-      else
-        if(get_kind(index) == LIT)
-          code("$%s", get_name(index));
-        else //function, reg
-          code("%s", get_name(index));
+    else if(get_kind(index) == PAR) // m*4(%14)
+	  code("%d(%%14)", 4 + get_atr1(index) *4);
+    else if(get_kind(index) == LIT)
+	  code("$%s", get_name(index));
+    else //function, reg
+      code("%s", get_name(index));
   }
 }
 
+void gen_sym_name_array_elem(int index, int offset) {
+  if(index > -1) {
+	if (get_kind(index) == ARR) // -n*4(%14)
+      code("-%d(%%14)", get_atr1(index) * 4 + (offset + 1) * 4);
+    else if(get_kind(index) == VAR) // -n*4(%14)
+      code("-%d(%%14)", get_atr1(index) * 4);
+    else if(get_kind(index) == PAR) // m*4(%14)
+	  code("%d(%%14)", 4 + get_atr1(index) *4);
+    else if(get_kind(index) == LIT)
+	  code("$%s", get_name(index));
+    else //function, reg
+      code("%s", get_name(index));
+  }
+}
 // OTHER
 
-void gen_cmp(int op1_index, int op2_index) {
-  if(get_type(op1_index) == INT)
+void gen_cmp(struct exp_vals *op1_index, struct exp_vals *op2_index) {
+  if(get_type(op1_index->index) == INT)
     code("\n\t\tCMPS \t");
   else
     code("\n\t\tCMPU \t");
-  gen_sym_name(op1_index);
-  code(",");
-  gen_sym_name(op2_index);
-  free_if_reg(op2_index);
-  free_if_reg(op1_index);
+  if(get_kind(op1_index->index) == ARR) 
+  {
+	  gen_sym_name_array_elem(op1_index->index, op1_index->value);
+	  code(",");
+	  gen_sym_name_array_elem(op2_index->index, op2_index->value);
+  } 
+  else 
+  {
+	  gen_sym_name(op1_index->index);
+	  code(",");
+	  gen_sym_name(op2_index->index);
+  }
+  free_if_reg(op2_index->index);
+  free_if_reg(op1_index->index);
 }
 
+void gen_mov_array(int input_index, int offset, int output_index) {
+  code("\n\t\tMOV \t");
+  gen_sym_name_array_elem(input_index, offset);
+  code(",");
+  gen_sym_name_array_elem(output_index, offset);
+
+  //ako se smešta u registar, treba preneti tip 
+  if(output_index >= 0 && output_index <= LAST_WORKING_REG)
+    set_type(output_index, get_type(input_index));
+  free_if_reg(input_index);
+
+}
 void gen_mov(int input_index, int output_index) {
   code("\n\t\tMOV \t");
   gen_sym_name(input_index);
