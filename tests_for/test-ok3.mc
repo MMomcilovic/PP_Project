@@ -1,4 +1,4 @@
-//OPIS: ugnjezdeni for
+//OPIS: ugnjezdene for petlje
 //RETURN: 60
 int main(){
 	int suma;
@@ -12,3 +12,4 @@ int main(){
 	}
 	return suma;
 }
+

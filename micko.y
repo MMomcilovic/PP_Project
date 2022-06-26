@@ -132,7 +132,7 @@ variable
   : _TYPE _ID _SEMICOLON
       {
         if(lookup_symbol($2, VAR|PAR|ARR|PTR) == NO_INDEX)
-           insert_symbol($2, VAR, $1, ++var_num, NO_ATR);
+           insert_symbol($2, VAR, $1, ++var_num, 0);
         else 
            err("redefinition of '%s'", $2);
       }
@@ -153,7 +153,7 @@ variable
         else 
            err("redefinition of '%s'", $2);
       }
-  | _TYPE _ID _ASSIGN _LBRACKET elements_list _RBRACKET _SEMICOLON
+  | _TYPE _ID _LSBRACKET _RSBRACKET _ASSIGN _LBRACKET elements_list _RBRACKET _SEMICOLON
 	  {
         if(lookup_symbol($2, VAR|PAR|ARR|PTR) == NO_INDEX)
 		{
@@ -271,8 +271,8 @@ assignment_statement
 	}
   }
   | _ID _ASSIGN _AMPRESAND _ID _SEMICOLON  {
-	int idx1 = lookup_symbol($1, VAR|PAR|ARR|PTR);
-	int idx2 = lookup_symbol($4, PTR);
+	int idx1 = lookup_symbol($1, PTR);
+	int idx2 = lookup_symbol($4, VAR|PAR|ARR|PTR);
 	if (idx1 == NO_INDEX) 
 	{
 		err("invalid lvalue '%s' in assignment", $1);
@@ -366,6 +366,16 @@ exp
 		value->value = -1;
 		$$ = value;
 	  }
+  | _POINTER _ID
+  {
+		int idx = lookup_symbol($2, PTR);
+		if (idx == NO_INDEX)
+          err("'%s' undeclared", $2);
+		struct exp_vals *value = (struct exp_vals*) malloc(sizeof(struct exp_vals));
+		value->index = idx;
+		value->value = -1;
+		$$ = value;
+  }
   ;
 
 literal
@@ -449,9 +459,13 @@ rel_exp
 return_statement
   : _RETURN num_exp _SEMICOLON
       {
-        if(get_type(fun_idx) != get_type($2->index))
+        if(get_type(fun_idx) != get_type($2->index)){
           err("incompatible types in return");
-        gen_mov($2->index, FUN_REG);
+		  }
+		if(get_kind($2->index) == ARR)
+			gen_mov_array($2->index, $2->value, FUN_REG);
+		else 
+			gen_mov($2->index, FUN_REG);
         code("\n\t\tJMP \t@%s_exit", get_name(fun_idx));        
       }
   ;
