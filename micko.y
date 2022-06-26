@@ -132,17 +132,15 @@ variable
   : _TYPE _ID _SEMICOLON
       {
         if(lookup_symbol($2, VAR|PAR|ARR|PTR) == NO_INDEX)
-           insert_symbol($2, VAR, $1, ++var_num, 0);
-        else 
+		{
+			if ($1 == INT_PTR || $1 == UINT_PTR)
+				insert_symbol($2, PTR, $1, ++var_num, NO_ATR);
+			else
+				insert_symbol($2, VAR, $1, ++var_num, 0);
+        }
+		else 
            err("redefinition of '%s'", $2);
       }
-  | _TYPE _POINTER _ID _SEMICOLON 
-	{
-		if(lookup_symbol($3, VAR|PAR|ARR|PTR) == NO_INDEX)
-			insert_symbol($3, PTR, $1, ++var_num, NO_ATR);
-		else 
-           err("redefinition of '%s'", $3);	
-	}
   | _TYPE _ID array_size _SEMICOLON // Definiton of array
   	  {
         if(lookup_symbol($2, VAR|PAR|ARR|PTR) == NO_INDEX)
@@ -249,8 +247,14 @@ assignment_statement
         if(idx == NO_INDEX)
           err("invalid lvalue '%s' in assignment", $1);
         else
-          if(get_type(idx) != get_type($3->index))
-            err("incompatible types in assignment");
+			{
+			if (!(get_type(idx) == INT && get_type($3->index) == INT_PTR)){
+				if (!(get_type(idx) == UINT && get_type($3->index) == UINT_PTR)){
+					if(get_type(idx) != get_type($3->index))
+						err("incompatible types in assignment");
+					}
+				}
+			}
 		if (get_kind($3->index) == ARR)
 			gen_mov_array($3->index, $3->value, idx);
 		else 
@@ -281,8 +285,10 @@ assignment_statement
 	{
 		err("invalid rvalue '%s' in assignment", $4);
 	}
-	if (get_type(idx1) != get_type(idx2)) 
-		err("incompatible types in assignment");
+	if (!(get_type(idx1) == INT_PTR && get_type(idx2) == INT)){
+		if (!(get_type(idx1) == UINT_PTR && get_type(idx2) == UINT))
+			err("incompatible types in assignment");
+		}
   }
   ;
 
@@ -290,8 +296,12 @@ num_exp
   : exp
   | num_exp _AROP exp
       {
-        if(get_type($1->index) != get_type($3->index))
-          err("invalid operands: arithmetic operation");
+		if (!((get_type($1->index) == INT_PTR && get_type($3->index) == INT) || (get_type($1->index) == INT && get_type($3->index) == INT_PTR))) {
+			if (!((get_type($1->index) == UINT_PTR && get_type($3->index) == UINT) || (get_type($1->index) == UINT && get_type($3->index) == UINT_PTR))) {
+				if(get_type($1->index) != get_type($3->index))
+					err("invalid operands: arithmetic operation");
+			}
+		}
         int t1 = get_type($1->index);    
         code("\n\t\t%s\t", ar_instructions[$2 + (t1 - 1) * AROP_NUMBER]);
 		
@@ -459,9 +469,14 @@ rel_exp
 return_statement
   : _RETURN num_exp _SEMICOLON
       {
-        if(get_type(fun_idx) != get_type($2->index)){
-          err("incompatible types in return");
-		  }
+		if (!(get_type(fun_idx) == INT && get_type($2->index) == INT)){
+			if (!(get_type(fun_idx) == UINT && get_type($2->index) == UINT)) { 
+			if ((get_type(fun_idx) == INT_PTR && (get_kind($2->index) == PTR || get_kind($2->index) == ARR) && get_type($2->index) == INT) || (get_type(fun_idx) == UINT_PTR && (get_kind($2->index) == PTR || get_kind($2->index) == ARR) && get_type($2->index) == UINT))
+				err("incompatible types in return");
+			else if(!((get_type(fun_idx) == INT && get_type($2->index) == INT_PTR) || (get_type(fun_idx) == UINT && get_type($2->index) == UINT_PTR)))
+				err("incompatible types in return");
+			}
+		}
 		if(get_kind($2->index) == ARR)
 			gen_mov_array($2->index, $2->value, FUN_REG);
 		else 
