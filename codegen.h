@@ -25,7 +25,4 @@ void gen_mov_array(int input_index, int offset, int output_index);
 // upisuje element niza u tabelu simbola
 void gen_sym_name_array_elem(int index, int offset);
 
-// generise MOV naredbu za elemente niza
-void gen_mov_from_array_elem(int input_index, int output_index, int offset);
-
 #endif
