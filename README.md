@@ -1,5 +1,5 @@
 # PP_Project
-Predmetni projekat iz Programski prevodioca sa temom Nizovi i pokazivači. Cilj je proširit micko kompajler za mini C jezik, tako da podržava nizove i pokazivače.
+Predmetni projekat iz Programskih prevodioca sa temom Nizovi i pokazivači. Cilj je proširit micko kompajler za mini C jezik, tako da podržava nizove i pokazivače.
 
 # Neophodni alati
 Za pokretanje projekta potrebno je imati alate: Flex, Bison i GCC Compiler
